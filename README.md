@@ -6,6 +6,7 @@ The prototype demonstrates a 6-scene interaction flow combining mouse interactio
 ---
 
 ## 🎮 Project Structure
+```
 finalDemo/
 ├── data/ # All image assets (backgrounds, trees, icons)
 ├── .vscode/ # VS Code Processing settings
@@ -17,7 +18,7 @@ finalDemo/
 ├── Scene04_LabelBreak.pde # Scene 04 – Label Wall Break Interaction
 ├── Scene05_PlanetGen.pde # Scene 05 – Planet Generation (based on gaze / randomness)
 └── Scene06_MiniTask.pde # Scene 06 – Simple Mini-task
-
+```
 
 ---
 
