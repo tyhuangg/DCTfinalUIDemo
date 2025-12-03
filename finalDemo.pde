@@ -1,0 +1,194 @@
+PImage bgImage;        
+PImage lightBallImage; 
+PImage[] treeFrames;  
+
+final int WIDTH = 800;
+final int HEIGHT = 600;
+final int TOTAL_FRAMES = 6;     
+final int FRAME_RATE_TARGET = 2; // 動畫播放速度：每秒更新 2 幀 
+
+// 光球位置和大小 
+float lightBallX = WIDTH / 2 - 10; 
+float lightBallY = HEIGHT * 1 / 3 + 15 ; 
+float hoverRadius = 20;
+
+float treeX = WIDTH / 2 - 10;
+float treeY = HEIGHT * 1 / 3 - 20 ; 
+
+// 計時
+long fixationStartTime = 0;
+final int SUCCESS_FIXATION_TIME = 2000; // 2.0 秒 = 2000 毫秒
+boolean isAnimationSuccessful = false; 
+
+// 動畫播放控制
+int currentFrameIndex = 0; // 起始幀：索引 0 (未生長)
+boolean isPlaying = false; 
+boolean isCompleted = false; 
+long lastFrameTime = 0; // 上次更新幀的時間
+
+void settings() {
+  size(WIDTH, HEIGHT);
+}
+
+void setup() {
+  imageMode(CENTER);
+  textAlign(LEFT, TOP);
+  frameRate(60); 
+
+  // 圖片載入
+  try {
+    bgImage = loadImage("background.png"); 
+    if (bgImage != null) bgImage.resize(WIDTH, HEIGHT);
+    lightBallImage = loadImage("lightball.png"); 
+    
+    treeFrames = new PImage[TOTAL_FRAMES];
+    for (int i = 0; i < TOTAL_FRAMES; i++) {
+      // nf(i, 2) 確保數字是兩位數 (00, 01, 02...)
+      String filename = "tree_" + nf(i, 2) + ".png"; 
+      treeFrames[i] = loadImage(filename);
+      if (treeFrames[i] == null) {
+          println("錯誤: 找不到幀文件: " + filename);
+      }
+    }
+    
+    println("所有資源載入成功！");
+  } catch (Exception e) {
+    println("警告：載入資源時發生錯誤。");
+  }
+}
+
+void draw() {
+  // 1. 繪製背景圖
+  if (bgImage != null) {
+    image(bgImage, WIDTH / 2, HEIGHT / 2);
+  } else {
+    background(20, 0, 40); 
+  }
+
+  // 2. 模擬眼動數據與 Hover 判定
+  int gazeX = mouseX;
+  int gazeY = mouseY;
+  float d = dist(gazeX, gazeY, lightBallX, lightBallY);
+  boolean isHovering = (d < hoverRadius);
+
+  // 3. 動畫播放與計時邏輯
+  
+  // A. 處理動畫進度更新 (如果正在播放)
+  if (isPlaying && !isCompleted) {
+    // 檢查是否達到幀更新時間間隔
+    long frameInterval = 1000 / FRAME_RATE_TARGET; 
+    if (millis() - lastFrameTime > frameInterval) {
+      currentFrameIndex++;
+      lastFrameTime = millis();
+    }
+    
+    // 檢查動畫是否完成
+    if (currentFrameIndex >= TOTAL_FRAMES) {
+      currentFrameIndex = TOTAL_FRAMES - 1; // 鎖定在最終幀 (索引 5)
+      isCompleted = true;
+      isPlaying = false;
+    }
+  }
+
+  // B. 處理注視與播放/暫停控制
+  if (!isCompleted) {
+    if (isHovering) {
+      if (fixationStartTime == 0) {
+        fixationStartTime = millis();
+        isPlaying = true; // 立即開始播放
+      }
+
+      long elapsedTime = millis() - fixationStartTime;
+      if (elapsedTime >= SUCCESS_FIXATION_TIME) {
+        isAnimationSuccessful = true;
+      }
+    } else {
+      // 移開視線
+      fixationStartTime = 0;
+      
+      if (!isAnimationSuccessful) {
+        // C. 未滿 2 秒即移開，停止播放並倒轉到起始幀
+        isPlaying = false;
+        currentFrameIndex = 0; // **修正：返回索引 0 (未生長)**
+      } else {
+        // D. 已成功注視 2 秒，動畫繼續播放
+      }
+    }
+  }
+  
+  // 4. 繪製元素
+  drawScene(gazeX, gazeY, isHovering);
+}
+
+// 繪製函式區 
+void drawScene(int gx, int gy, boolean hover) {
+  
+  drawTreeAnimation(treeX, treeY);
+  
+  // 繪製光球
+  if (lightBallImage != null) {
+    int alpha = hover ? 255 : 150; 
+    tint(255, alpha); 
+    
+    // --- 修正區域開始 ---
+    float originalWidth = lightBallImage.width;
+    float originalHeight = lightBallImage.height;
+    
+    // 設定目標寬度：我們將目標寬度設為 80 像素 (這會讓它與 hoverRadius 40 相符)
+    float targetWidth = 80; 
+    
+    // 根據長寬比計算目標高度，確保等比例
+    float targetHeight = targetWidth * (originalHeight / originalWidth); 
+    
+    // 使用計算後的 targetWidth 和 targetHeight 繪製等比例縮小的圖片
+    image(lightBallImage, lightBallX, lightBallY, targetWidth, targetHeight); 
+    
+    // --- 修正區域結束 ---
+    
+    noTint(); 
+  } else {
+    fill(255, 255, 0, hover ? 200 : 80);
+    ellipse(lightBallX, lightBallY, hoverRadius * 2, hoverRadius * 2);
+  }
+
+  // 繪製模擬的眼動追蹤點
+  fill(255, 0, 0);
+  noStroke();
+  ellipse(gx, gy, 10, 10);
+  
+  // 顯示狀態 (除錯資訊)
+  drawDebugInfo(hover);
+}
+// 繪製樹苗動畫的函式
+void drawTreeAnimation(float x, float y) {
+  // 確保陣列存在且當前索引在範圍內
+  if (treeFrames != null && currentFrameIndex >= 0 && currentFrameIndex < TOTAL_FRAMES) {
+      float animWidth = 150; 
+      float animHeight = 200;
+      
+      // 繪製當前幀
+      image(treeFrames[currentFrameIndex], x, y, animWidth, animHeight);
+  }
+}
+
+// 顯示除錯資訊
+void drawDebugInfo(boolean hover) {
+  fill(255);
+  textSize(16);
+  long currentFixationTime = (fixationStartTime == 0) ? 0 : millis() - fixationStartTime;
+  
+  text("--- Debug Information ---", 10, 10);
+  text("1. Hovering: " + hover, 10, 30);
+  text("2. Fixation Time: " + currentFixationTime + " / " + SUCCESS_FIXATION_TIME + " ms", 10, 50);
+  
+  String successText = isAnimationSuccessful ? "YES" : "NO";
+  text("3. Success Fixation: " + successText, 10, 70);
+  
+  String animState = "Paused";
+  if (isCompleted) {
+      animState = "Completed (Index 5)";
+  } else if (isPlaying) {
+      animState = "Playing (Index " + currentFrameIndex + ")";
+  }
+  text("4. Animation State: " + animState, 10, 90);
+}
